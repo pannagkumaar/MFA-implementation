@@ -11,6 +11,11 @@ users = {
         'otp_secret': 'apple',
     }
 }
+import random
+from prime import primitive_root, getLowLevelPrime, isMillerRabinPassed
+
+
+
 signed_in_users = {}
 active_connections = 0
 
@@ -68,7 +73,53 @@ def handle_signout(conn, data):
         print(f"No user is currently signed in for user: {username}")
 
     conn.close()  # Close the connection after sending the response
+def send_key(conn):
+    def get_prime_and_base():
+        while True:
+            n = 20
+            prime_candidate = getLowLevelPrime(n)
+            if not isMillerRabinPassed(prime_candidate):
+                continue
+            else:
+                base = primitive_root(prime_candidate)
+                return prime_candidate, base
+    def diffie_hellman():
+        prime, base = get_prime_and_base()
+        private_key = random.randint(2, prime - 2)
+        public_key = (base ** private_key) % prime
+        return prime, base, private_key, public_key
+    
+    def encrypt_string(string, key):
+        print("debug3")
+        encrypted_string = ""
+        for char in string:
+            encrypted_char = chr(ord(char) + key)
+            encrypted_string += encrypted_char
+        return encrypted_string
+    def calculate_shared_secret_key(public_key, private_key, prime):
+        return (public_key ** private_key) % prime
 
+    def server(conn):
+        prime, base, private_key, public_key = diffie_hellman()
+        client_public_key = int(conn.recv(1024).decode())
+        print("Received client public key:", client_public_key)
+        
+        conn.send(str(prime).encode())
+        conn.send(str(base).encode())
+        conn.send(str(public_key).encode())
+
+        shared_secret_key = calculate_shared_secret_key(client_public_key, private_key, prime)
+        print("Shared Secret Key:", shared_secret_key)
+
+        string_to_send = "Hello, server!Hello, server!"
+        print("debug0")
+        encrypted_string = encrypt_string(string_to_send, shared_secret_key)
+        print("debug1")
+        conn.send(encrypted_string.encode())
+        print("debug2")    
+        
+
+    server(conn)    
 def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
@@ -81,7 +132,7 @@ def main():
                 print("Waiting for connection...")
                 conn, addr = server_socket.accept()
                 print(f'Connected by {addr}')
-
+                send_key(conn)
                 with conn:
                     print("Connection accepted")
 
