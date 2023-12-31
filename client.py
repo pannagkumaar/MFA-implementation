@@ -7,41 +7,8 @@ import random
 HOST = '127.0.0.1'
 PORT = 12345
 
-def check_otp_secretkey_exists():
-    """
-    Check if the key-value pair for otp_secretkey exists in the .env file.
 
-    Returns:
-        bool: True if the key-value pair exists, False otherwise.
-    """
-    env_file_path = ".env"
-    
-    # Load the environment variables from the .env file
-    load_dotenv(env_file_path)
 
-    # Check if the otp_secretkey key is present in the environment variables
-    otp_secretkey_value = os.getenv("otp_secretkey")
-    return otp_secretkey_value is not None
-def get_shared_secret_key(conn):
-    """
-    Generate a shared secret key for OTP and store it in the .env file.
-
-    Returns:
-        str: The generated shared secret key.
-    """
-    env_file_path = ".env"
-    
-    # Load the environment variables from the .env file
-    load_dotenv(env_file_path)
-
-    # Generate a shared secret key for OTP
-    otp_secret = dh_secret(conn)
-
-    # Store the shared secret key in the .env file
-    with open(env_file_path, "a") as f:
-        f.write(f"otp_secretkey={otp_secret}\n")
-
-    return otp_secret
 
 def dh_secret(conn):
     def diffie_hellman(prime,base):
@@ -93,8 +60,8 @@ def send_request(data,client_socket):
 
     except ConnectionRefusedError:
         print("Error: Connection to the server was refused. Make sure the server is running.")
-    except Exception as e:
-        print(f"Error: {e}")
+    # except Exception as e:
+    #     print(f"Error: {e}")
 
 def login(otp_secret,conn):
     try:
@@ -112,8 +79,11 @@ def login(otp_secret,conn):
     except Exception as e:
         print(f"Error during login: {e}")
 
+
+#todo signout not functioning properly
 def signout(conn):
     try:
+        print(conn)
         username = input("Enter your username: ")
         data = {'action': 'signout', 'username': username}
         send_request(data,conn)
@@ -121,14 +91,23 @@ def signout(conn):
     except Exception as e:
         print(f"Error during sign-out: {e}")
 
+
 if __name__ == '__main__':
-    if not check_otp_secretkey_exists():
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as conn:
-            conn.connect((HOST, PORT))
-            print("Connection established for secret key generation.")
-            otp_secret = get_shared_secret_key(conn)
-    else:
-        otp_secret = os.getenv("otp_secretkey")
+    conn = None
+
+    try:
+        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        conn.connect((HOST, PORT))
+        print("Connection established for secret key generation.")
+    except Exception as e:
+        print(f"Error: {e}")
+        # Handle connection errors here
+
+   
+    otp_secret = dh_secret(conn)
+    print("otp_secretkey generated and stored in .env file.", otp_secret)
+
+
     while True:
         print("\n1. Login")
         print("2. Sign-out")
@@ -138,7 +117,7 @@ if __name__ == '__main__':
             choice = input("Enter your choice (1, 2, or 3): ")
 
             if choice == '1':
-                login(otp_secret,conn)
+                login(otp_secret, conn)
             elif choice == '2':
                 signout(conn)
             elif choice == '3':
@@ -151,5 +130,3 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             print("\nClient terminated by user.")
             break
-        except Exception as e:
-            print(f"Error: {e}")
