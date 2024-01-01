@@ -3,6 +3,7 @@ import pyotp
 import os
 from dotenv import load_dotenv
 import random
+import time
 
 HOST = '127.0.0.1'
 PORT = 12345
@@ -49,21 +50,25 @@ def dh_secret(conn):
         return decrypted_string
     return client(conn)
 
-def send_request(data,client_socket):
+def send_request(data):
     try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.connect((HOST, PORT))
+            print("Connection established")
 
             client_socket.sendall(str(data).encode('utf-8'))
             print("Request sent")
 
             response = client_socket.recv(1024)
             print(response.decode('utf-8'))
+            client_socket.close()
 
     except ConnectionRefusedError:
         print("Error: Connection to the server was refused. Make sure the server is running.")
-    # except Exception as e:
-    #     print(f"Error: {e}")
+    except Exception as e:
+        print(f"Error: {e}")
 
-def login(otp_secret,conn):
+def login(otp_secret):
     try:
         username = input("Enter your username: ")
         password = input("Enter your password: ")
@@ -74,22 +79,24 @@ def login(otp_secret,conn):
         otp_code = totp.now()
 
         data = {'action': 'login', 'username': username, 'password': password, 'otp_code': otp_code}
-        send_request(data,conn)
+        send_request(data)
 
     except Exception as e:
         print(f"Error during login: {e}")
 
 
 #todo signout not functioning properly
-def signout(conn):
-    try:
-        print(conn)
-        username = input("Enter your username: ")
-        data = {'action': 'signout', 'username': username}
-        send_request(data,conn)
+def signout():
+    print("Signing out...")
+    # try:
+    print(conn)
+    username = input("Enter your username: ")
+    data = {'action': 'signout', 'username': username}
+    send_request(data)
+    
 
-    except Exception as e:
-        print(f"Error during sign-out: {e}")
+    # except Exception as e:
+    #     print(f"Error during sign-out: {e}")
 
 
 if __name__ == '__main__':
@@ -105,6 +112,11 @@ if __name__ == '__main__':
 
    
     otp_secret = dh_secret(conn)
+    if otp_secret :
+        conn.close()
+        time.sleep(5)
+    else:
+        otp_secret=dh_secret(conn)    
     print("otp_secretkey generated and stored in .env file.", otp_secret)
 
 
@@ -117,9 +129,10 @@ if __name__ == '__main__':
             choice = input("Enter your choice (1, 2, or 3): ")
 
             if choice == '1':
-                login(otp_secret, conn)
+                login(otp_secret)
             elif choice == '2':
-                signout(conn)
+                print("debug")
+                signout()
             elif choice == '3':
                 print("Exiting the client.")
                 conn.close()

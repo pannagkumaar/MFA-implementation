@@ -121,27 +121,26 @@ def send_key(conn):
 
     server(conn)    
 def main():
-    count =0
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
         server_socket.listen()
 
         print(f'Server listening on {HOST}:{PORT}')
+        conn, addr = server_socket.accept()
+        print(f'Connected by {addr}')
+        send_key(conn)
 
         while True:
             if active_connections < MAX_ACTIVE_CONNECTIONS:
                 print("Waiting for connection...")
+
                 conn, addr = server_socket.accept()
-                print(f'Connected by {addr}')
-                if count ==0:
-                    send_key(conn)
-                    count+=1
                 with conn:
                     print("Connection accepted")
 
                     data = conn.recv(1024)
                     if not data:
-                        break
+                        print("No data received")
 
                     data_dict = eval(data.decode('utf-8'))
                     action = data_dict.get('action', '')
