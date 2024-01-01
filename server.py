@@ -1,23 +1,45 @@
 import socket
+import string
+import random
+from prime import primitive_root, getLowLevelPrime, isMillerRabinPassed
 import pyotp
+import time
+import threading
+import json
+signed_in_users = {}
+active_connections = 0
 
 HOST = '127.0.0.1'
 PORT = 12345
 MAX_ACTIVE_CONNECTIONS = 2  # Allow more than one connection
 
-users = {
-    'john_doe': {
-        'password': 'apple',
-        'otp_secret': 'abcdefghijklmnopqrstuvwxyz',
-    }
-}
-import random
-from prime import primitive_root, getLowLevelPrime, isMillerRabinPassed
+users=open("users.json","r+")
+def generate_otp_secret():
+    random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
+    random_string_list = list(random_string)
+    random.shuffle(random_string_list)
+    random_string = ''.join(random_string_list)
+    return random_string
+def refresh_secret_key(users_file="users.json"):
+    with open(users_file, "r+") as file:
+        users_data = json.load(file)
+
+        for user in users_data:
+            generated_otp_secret = generate_otp_secret()
+            users_data[user]['otp_secret'] = generated_otp_secret
+            print(f"New OTP secret for user {user}: {generated_otp_secret}")
+        file.seek(0)
+        file.truncate()
+        json.dump(users_data, file)
+    time.sleep(100)
 
 
+    
 
-signed_in_users = {}
-active_connections = 0
+def check_user_exists(username):
+    return username in users
+
+
 
 def handle_login(conn, data):
     global active_connections
@@ -39,8 +61,9 @@ def handle_login(conn, data):
         conn.close()
         return
 
-    if username in users and users[username]['password'] == password:
-        totp = pyotp.TOTP(users[username]['otp_secret'])
+    if check_user_exists(username) and users[username]['password'] == password:
+        
+        totp =pyotp.TOTP(users[username]['otp_secret'])
         if totp.verify(otp_code):
             signed_in_users[username] = True
             active_connections += 1
@@ -121,6 +144,8 @@ def send_key(conn):
 
     server(conn)    
 def main():
+    refresh_thread = threading.Thread(target=refresh_secret_key)
+    refresh_thread.start()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, PORT))
         server_socket.listen()
